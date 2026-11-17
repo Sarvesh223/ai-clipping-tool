@@ -1,0 +1,21 @@
+# Python environment & cache
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+
+# Secrets / local config
+.env
+
+# Generated data (bade video files, database)
+downloads/
+processed/
+exports/
+models/
+
+# OS / editor
+.DS_Store
+Thumbs.db

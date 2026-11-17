@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart
+yt-dlp
+faster-whisper>=1.0
+sentence-transformers>=2.7
+opencv-python
+numpy
+pytest
+# GPU (GTX 1650 Ti): CUDA libs for faster-whisper, installed by setup_windows.bat
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
