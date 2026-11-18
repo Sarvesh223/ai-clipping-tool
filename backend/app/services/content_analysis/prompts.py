@@ -12,7 +12,10 @@ Rules:
 Return JSON: {"candidates":[{"start_line":int,"end_line":int,"hook_quote":str,"main_message":str,"why":str,
 "target_audience":str,"titles":[5 strings],"caption":str,"editing_style":str,
 "category":str,"scores":{"hook":0-10,"information":0-10,"emotion":0-10,"curiosity":0-10,
-"completeness":0-10,"independence":0-10}}]}"""
+"completeness":0-10,"independence":0-10,"shareability":0-10,"retention":0-10,"viral_potential":0-10}}]}
+Scoring guide: shareability = would someone send this to a friend; retention = does it pay off so people watch to the end;
+viral_potential = overall judgement that a stranger would stop scrolling, finish it and share it. Be critical: most clips are 3-6.
+Do not call anything a guaranteed hit."""
 
 def user_prompt(chunk_text, lo, hi, n, audience, style):
     return (f"Target audience: {audience}. Preferred style: {style}.\n"

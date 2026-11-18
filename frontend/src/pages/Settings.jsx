@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'; import { api } from '../services/api.js'; import { usePoll } from '../hooks/usePoll.js'; import { Err } from '../components/ui.jsx'
-const W = [['hook', 'Hook strength'], ['information', 'Information value'], ['emotion', 'Emotional intensity'], ['curiosity', 'Curiosity factor'], ['completeness', 'Story completeness'], ['engagement', 'Audio engagement'], ['independence', 'Context independence']]
-const DEF = { hook: .2, information: .2, emotion: .15, curiosity: .15, completeness: .15, engagement: .1, independence: .05 }
+const W = [['hook', 'Hook strength'], ['information', 'Information value'], ['emotion', 'Emotional intensity'], ['curiosity', 'Curiosity factor'], ['completeness', 'Story completeness'], ['shareability', 'Shareability'], ['retention', 'Retention / payoff'], ['viral', 'Viral potential (AI judgement)'], ['engagement', 'Audio energy & pace'], ['independence', 'Context independence']]
+const DEF = { hook: .12, information: .13, emotion: .12, curiosity: .12, completeness: .12, shareability: .09, retention: .07, viral: .08, engagement: .10, independence: .05 }
 export default function Settings() {
   const [h] = usePoll(api.health, 0); const [s, setS] = useState(null); const [msg, setMsg] = useState('')
-  useEffect(() => { api.settings().then(x => setS({ chunk_seconds: 180, chunk_overlap: 30, min_clip_s: 15, max_clip_s: 90, weights: DEF, ...x })) }, [])
+  useEffect(() => { api.settings().then(x => setS({ chunk_seconds: 180, chunk_overlap: 30, min_clip_s: 15, max_clip_s: 90, ...x, weights: { ...DEF, ...(x.weights || {}) } })) }, [])
   if (!s) return <div className="text-slate-400">Loading…</div>
   const set = (k, v) => setS({ ...s, [k]: v }); const save = async () => { await api.saveSettings(s); setMsg('Saved. Applies to the next analysis.') }
   const hw = h?.hardware; const total = Object.values(s.weights).reduce((a, b) => a + b, 0)

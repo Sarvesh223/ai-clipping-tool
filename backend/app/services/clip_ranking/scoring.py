@@ -10,7 +10,7 @@ DEPENDENT = {"he","she","they","it","this","that","those","these","him","her","t
 def _words(t: Transcript, a, b):
     return [w for s in t.segments if s.end > a and s.start < b for w in s.words if a <= w.start < b]
 
-def engagement_signal(t: Transcript, c: Candidate) -> float:
+def engagement_signal(t: Transcript, c: Candidate, energy=None) -> float:
     """0-10 audio-engagement proxy from measured speech: pace, pace variation, questions/exclamations.
     (Visual engagement requires the video stage; see README limitations.)"""
     txt = t.text_between(c.start, c.end)
@@ -18,7 +18,8 @@ def engagement_signal(t: Transcript, c: Candidate) -> float:
     wps = len(words) / max(c.duration, 1)
     pace = 10 - min(10, abs(wps - 2.8) * 3.5)           # ~2.8 words/s is lively conversational speech
     punct = min(10, (txt.count("?") + txt.count("!")) * 2.5)
-    return round(0.7 * pace + 0.3 * punct, 2)
+    speech = 0.7 * pace + 0.3 * punct
+    return round(0.5 * speech + 0.5 * energy(c.start, c.end), 2) if energy else round(speech, 2)
 
 def penalties(t: Transcript, c: Candidate) -> dict:
     p = {}
@@ -44,18 +45,23 @@ def penalties(t: Transcript, c: Candidate) -> dict:
         p["needs_explanation"] = 6
     return p
 
-def score_candidate(t: Transcript, c: Candidate, weights=None) -> Candidate:
+def score_candidate(t: Transcript, c: Candidate, weights=None, energy=None) -> Candidate:
     w = weights or settings.weights
-    dims = dict(c.llm_scores); dims["engagement"] = engagement_signal(t, c)
+    dims = dict(c.llm_scores); dims["viral"] = dims.pop("viral_potential", 0.0)
+    dims["engagement"] = engagement_signal(t, c, energy)
     total_w = sum(w.values()) or 1
-    base = sum(w[k] * dims.get(k, 0) * 10 for k in w) / total_w   # 0-100
-    pen = penalties(t, c)
-    c.penalties = pen
+    base = sum(w[k] * dims.get(k, 0) * 10 for k in w) / total_w   # 0-100 weighted quality
+    pen = penalties(t, c); c.penalties = pen; ps = sum(pen.values())
     c.score_breakdown = {k: round(dims.get(k, 0), 2) for k in w}
-    # multi-chunk agreement is mild evidence the moment stands out (capped bonus)
-    bonus = min(4, (c.sources - 1) * 2)
-    c.score = round(max(0, min(99, base - sum(pen.values()) + bonus)), 1)  # never 100: estimate, not a guarantee
+    bonus = min(4, (c.sources - 1) * 2)    # multi-chunk agreement: mild, capped
+    c.quality = max(0, min(99, base - ps + bonus))
+    # Viral potential: shareability/retention/curiosity/emotion/hook + measured energy. An ESTIMATE, not a prediction.
+    v = (0.28 * dims["viral"] + 0.20 * dims.get("shareability", 0) + 0.14 * dims.get("retention", 0) + 0.12 * dims.get("hook", 0)
+         + 0.10 * dims.get("curiosity", 0) + 0.08 * dims.get("emotion", 0) + 0.08 * dims["engagement"]) * 10
+    c.viral_pct = round(max(0, min(97, v - 0.6 * ps)), 1)
+    c.score = round(max(0, min(99, 0.6 * c.quality + 0.4 * c.viral_pct)), 1)   # ranking = quality AND viral potential
+    c.quality = round(c.quality, 1)
     return c
 
-def rank(t: Transcript, cands: List[Candidate], weights=None) -> List[Candidate]:
-    return sorted((score_candidate(t, c, weights) for c in cands), key=lambda c: -c.score)
+def rank(t: Transcript, cands: List[Candidate], weights=None, energy=None) -> List[Candidate]:
+    return sorted((score_candidate(t, c, weights, energy) for c in cands), key=lambda c: -c.score)

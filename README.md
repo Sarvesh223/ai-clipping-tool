@@ -2,7 +2,7 @@
 
 All AI runs locally (Ollama, faster-whisper, sentence-transformers). No API keys.
 
-
+## Tuned for: HP Pavilion 15, GTX 1650 Ti (4 GB VRAM), 16 GB RAM
 - Whisper `small` (int8 on GPU, auto CPU fallback) -> freed -> Ollama `qwen3:4b`. They never share VRAM.
 - Do not use `qwen3:8b` / Whisper `medium` at the same time as other GPU apps; they may spill to CPU (slow, still works).
 - Rendering uses NVENC when it works, otherwise CPU x264 (automatic).
@@ -22,7 +22,15 @@ face-tracked crop with blurred fallback) -> karaoke captions (3 templates) -> th
 SQLite persistence, queue resumes after restart, cancel/retry, real progress (done/total).
 REST API: see /docs (projects, clips edit/re-render/delete/export, settings, health, hardware).
 
-## Limitations and working on progress (honest)
+## Viral potential & silent videos
+- Every clip gets a **Quality score** (weighted hook/information/emotion/curiosity/completeness/shareability/retention/AI viral judgement/audio energy/context, minus penalties)
+  and a **Viral potential %** (shareability, retention, AI viral judgement, hook, curiosity, emotion, measured audio energy). Ranking = 60% quality + 40% viral.
+- Viral potential is an ESTIMATE from the signals above; no tool can predict virality, and a small local model's judgement is noisy.
+- **No speech / no audio track**: Whisper and the LLM are skipped. The video is cut into equal 15-25 s parts; each boundary is snapped to a detected
+  scene cut when that keeps every part within 15-25 s. Parts are ranked by motion, cut density and (if there is audio) audio energy. No captions are burned in.
+
+## Limitations (honest)
+- Silent-video ranking is relative to the other parts of the same video (min-max), so scores spread widely even for similar parts.
 - React UI (8 pages) is written and syntax-checked but has never been run in a browser; expect small first-run fixes.
 - Not implemented: max-memory limit, parallel-worker count (kept at 1 on purpose for 4 GB VRAM), diarization, emoji captions, saved export presets, multi-video batch UI (queue works, videos run one at a time).
 - Face tracking uses OpenCV Haar (frontal faces). Multi-speaker "active speaker" = nearest-to-previous face; no lip-motion/diarization yet.

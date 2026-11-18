@@ -44,7 +44,7 @@ def _build(raw, t, sa, eb):
         hook = first.split(". ")[0][:200]
     sc = raw.get("scores", {}) or {}
     clean = {k: max(0.0, min(10.0, float(sc.get(k, 0) or 0))) for k in
-             ("hook", "information", "emotion", "curiosity", "completeness", "independence")}
+             ("hook", "information", "emotion", "curiosity", "completeness", "independence", "shareability", "retention", "viral_potential")}
     titles = [str(x) for x in (raw.get("titles") or [])][:5]
     return Candidate(start=sa, end=eb, hook=hook, main_message=str(raw.get("main_message", "")),
         why=str(raw.get("why", "")), audience=str(raw.get("target_audience", "")),

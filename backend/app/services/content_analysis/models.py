@@ -27,6 +27,7 @@ class Candidate:
     llm_scores: dict = field(default_factory=dict)   # 0-10 per dimension
     score: float = 0.0; score_breakdown: dict = field(default_factory=dict)
     penalties: dict = field(default_factory=dict)
+    viral_pct: float = 0.0; quality: float = 0.0
     sources: int = 1
     @property
     def duration(self): return self.end - self.start
