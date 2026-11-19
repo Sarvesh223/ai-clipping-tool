@@ -2,7 +2,7 @@
 
 All AI runs locally (Ollama, faster-whisper, sentence-transformers). No API keys.
 
-## Tuned for: HP Pavilion 15, GTX 1650 Ti (4 GB VRAM), 16 GB RAM
+
 - Whisper `small` (int8 on GPU, auto CPU fallback) -> freed -> Ollama `qwen3:4b`. They never share VRAM.
 - Do not use `qwen3:8b` / Whisper `medium` at the same time as other GPU apps; they may spill to CPU (slow, still works).
 - Rendering uses NVENC when it works, otherwise CPU x264 (automatic).
