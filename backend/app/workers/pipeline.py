@@ -7,6 +7,7 @@ from ..core.paths import PROCESSED
 from ..services.downloader import ytdlp_service as dl
 from ..services.transcription import whisper_service as ws
 from ..services.content_analysis.analyzer import analyze
+from ..services.content_analysis import fast_analyzer as fast
 from ..services.content_analysis import llm_client, signals as sig
 from ..services.content_analysis.models import Transcript
 from ..services.clip_ranking.scoring import rank
@@ -20,7 +21,7 @@ _q: "queue.Queue[int]" = queue.Queue(); _cancel: set = set()
 
 def apply_settings():
     s = db.get_settings()
-    for k in ("ollama_model", "chunk_seconds", "chunk_overlap", "min_clip_s", "max_clip_s"):
+    for k in ("ollama_model", "chunk_seconds", "chunk_overlap", "min_clip_s", "max_clip_s", "speed_mode", "auto_render_top", "render_height"):
         if k in s: setattr(settings, k, s[k])
     if "weights" in s: settings.weights = {**DEFAULT_WEIGHTS, **s["weights"]}
     return s
@@ -60,20 +61,34 @@ def _analyze_speech(pid, p, video, work, tr, lang, chk):
     stage(pid, "understanding")                      # Whisper is freed; now the LLM gets the VRAM
     llm_client.check_ollama(settings.ollama_url, settings.ollama_model)
     funnel = {}
-    cands = analyze(tr, p["audience"], p["style"], workers=1, stats=funnel, progress=lambda d, t: db.update("projects", pid, done=d, total=t))
-    if chk(): raise RuntimeError("cancelled")
-    stage(pid, "ranking")
     try: energy = sig.AudioEnergy(_wav(video, work)).score
     except Exception as e: print("[pipeline] audio energy unavailable:", e); energy = None
+    prog = lambda d, t: db.update("projects", pid, done=d, total=t)
+    if settings.speed_mode == "quality":
+        cands = analyze(tr, p["audience"], p["style"], workers=1, stats=funnel, progress=prog)
+    else:
+        k = min(30, int(target_count(tr.duration) * 1.3))
+        cands = fast.analyze_fast(tr, p["audience"], p["style"], energy=energy, k=k, stats=funnel, progress=prog)
+    if chk(): raise RuntimeError("cancelled")
+    stage(pid, "ranking")
     ranked = rank(tr, cands, energy=energy)
     picked, method = select_diverse(tr, ranked, target_count(tr.duration), settings.dup_similarity)
     final = optimize_all(tr, picked)
+    if settings.speed_mode != "quality": fast.add_titles(final, tr, p["audience"], p["style"])
     funnel.update(ranked=len(ranked), dropped_as_duplicates=len(ranked) - len(picked), final=len(final), video_s=round(tr.duration))
     db.set_setting(f"funnel_{pid}", funnel); print("[pipeline] funnel:", funnel)
     return [_insert(pid, c.start, c.end, c.score, c.title, dict(hook=c.hook, main_message=c.main_message, why=c.why,
             audience=c.audience, titles=c.titles, caption=c.caption, edit_style=c.edit_style, category=c.category,
             breakdown=c.score_breakdown, penalties=c.penalties, viral_pct=c.viral_pct, quality=c.quality,
             language=lang, dedup=method, mode="speech")) for c in final]
+
+def _select_render(ids):
+    """Render only the best N clips up front (rendering is the slowest step); the rest render on demand."""
+    if not ids: return []
+    rows = db.all_(f"SELECT id FROM clips WHERE id IN ({','.join('?' * len(ids))}) ORDER BY score DESC", ids)
+    n = int(settings.auto_render_top or 0); pick = [r["id"] for r in rows][: n or None]
+    for r in rows: db.update("clips", r["id"], status="queued" if r["id"] in pick else "pending")
+    return pick
 
 def run_project(pid):
     p = db.one("SELECT * FROM projects WHERE id=?", (pid,)); apply_settings()
@@ -93,12 +108,13 @@ def run_project(pid):
     else:                                            # no audio stream at all: skip Whisper entirely
         tr, lang = Transcript([]), "none"; ws.save(tr, lang, work / "transcript")
     existing = db.all_("SELECT id,status FROM clips WHERE project_id=? AND deleted=0", (pid,))
-    if existing:                                     # resume: analysis already done, only render what is unfinished
-        ids = [c["id"] for c in existing if c["status"] != "ready"]
+    if existing:                                     # resume: analysis done; only finish clips that were queued/failed (pending ones wait for a click)
+        ids = [c["id"] for c in existing if c["status"] in ("queued", "failed", "rendering")]
     elif (not audio) or sig.is_speechless(tr, duration):
         ids = _plan_visual(pid, video, work, duration, audio)
     else:
         ids = _analyze_speech(pid, p, video, work, tr, lang, chk)
+    if not existing: ids = _select_render(ids)
     stage(pid, "rendering", 0, len(ids))
     for n, cid in enumerate(ids, 1):
         if chk(): raise RuntimeError("cancelled")
@@ -114,7 +130,7 @@ def render(cid, tr=None):
     db.update("clips", cid, status="rendering")
     try:
         use_gpu = db.get_settings().get("device", "auto") != "cpu"
-        render_clip(p["path"], c["start"], c["end"], out, words, c["aspect"], c["caption_template"], True, use_gpu)
+        render_clip(p["path"], c["start"], c["end"], out, words, c["aspect"], c["caption_template"], True, use_gpu, int(settings.render_height or 1080))
         thumbnails(p["path"], c["start"], c["end"], work, cid, 4)
         db.update("clips", cid, out_path=str(out), status="ready")
     except Exception as e:

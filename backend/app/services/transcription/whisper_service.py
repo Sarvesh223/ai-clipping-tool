@@ -38,7 +38,11 @@ def _add_cuda_dlls():
             os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
 
 def _run(m, audio, model, on_progress, cancelled):
-    segs_iter, info = m.transcribe(audio, word_timestamps=True, vad_filter=True, beam_size=1 if model in ("tiny", "base") else 3)
+    try:                                   # batched decoding: several audio windows at once -> typically 2-4x faster
+        from faster_whisper import BatchedInferencePipeline
+        segs_iter, info = BatchedInferencePipeline(model=m).transcribe(audio, batch_size=8, word_timestamps=True, beam_size=1)
+    except ImportError:                    # older faster-whisper: sequential
+        segs_iter, info = m.transcribe(audio, word_timestamps=True, vad_filter=True, beam_size=1)
     segs = []
     for s in segs_iter:
         if cancelled(): raise RuntimeError("cancelled")

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from .core.paths import PROCESSED, EXPORTS, DOWNLOADS
 from .database import db
 from .workers import pipeline
-from .utils.hardware import hardware
+from .utils.hardware import hardware, recommend
 from .services.downloader import ytdlp_service as dl
 from .services.caption_generator.ass import TEMPLATES
 from .services.content_analysis import llm_client
@@ -19,22 +19,22 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http
 def _s(): pipeline.start()
 
 # Recommended presets for GTX 1650 Ti (4 GB VRAM) / 16 GB RAM
-PRESETS = {"low": dict(whisper_model="base", ollama_model="qwen3:4b", device="auto"),
-           "balanced": dict(whisper_model="small", ollama_model="qwen3:4b", device="auto"),
-           "high": dict(whisper_model="medium", ollama_model="qwen3:8b", device="auto")}
+PRESETS = {"fastest": dict(whisper_model="base", ollama_model="qwen3:1.7b", device="auto", speed_mode="fast", render_height=720, auto_render_top=3),
+           "fast": dict(whisper_model="base", ollama_model="qwen3:4b", device="auto", speed_mode="fast", render_height=720, auto_render_top=5),
+           "quality": dict(whisper_model="small", ollama_model="qwen3:4b", device="auto", speed_mode="quality", render_height=1080, auto_render_top=0)}
 
 class NewProject(BaseModel):
     url: str; quality: int = 720; audience: str = "General audience"; style: str = "Educational"
 
 @app.get("/api/health")
 def health():
-    h = hardware(); out = dict(hardware=h, presets=PRESETS, templates=list(TEMPLATES))
+    h = hardware(); out = dict(hardware=h, presets=PRESETS, recommended=recommend(h), templates=list(TEMPLATES))
     try: out["ollama"] = llm_client.check_ollama(settings.ollama_url, settings.ollama_model)
     except Exception as e: out["ollama"] = {"ok": False, "error": str(e)}
     return out
 
 @app.get("/api/settings")
-def get_settings(): return {**PRESETS["balanced"], **db.get_settings()}
+def get_settings(): return {**PRESETS["fast"], **db.get_settings()}
 @app.put("/api/settings")
 def put_settings(body: dict):
     for k, v in body.items(): db.set_setting(k, v)

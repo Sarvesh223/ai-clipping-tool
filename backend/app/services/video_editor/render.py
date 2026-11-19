@@ -14,9 +14,9 @@ def nvenc_ok():
     r = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True)
     return "h264_nvenc" in r.stdout
 
-def render_clip(video, start, end, out, words=None, aspect="9:16", template="bold_yellow", captions=True, use_gpu=False):
+def render_clip(video, start, end, out, words=None, aspect="9:16", template="bold_yellow", captions=True, use_gpu=False, height=1080):
     out = Path(out); work = out.parent / f".w_{out.stem}"; work.mkdir(parents=True, exist_ok=True)
-    W, H = SIZES[aspect]; sw, sh = _probe(video); dur = end - start
+    W, H = SIZES[aspect]; k = height / 1080; W, H = int(W * k) // 2 * 2, int(H * k) // 2 * 2; sw, sh = _probe(video); dur = end - start
     mode = "scale"
     f = ""
     if aspect != "16:9" or abs(sw / sh - W / H) > 0.05:
@@ -38,7 +38,7 @@ def render_clip(video, start, end, out, words=None, aspect="9:16", template="bol
     if captions and words:
         (work / "c.ass").write_text(build_ass(words, start, end, W, H, template), encoding="utf-8")
         f += f";[v0]subtitles=c.ass[v1]"; last = "v1"
-    cpu = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"]
+    cpu = ["-c:v", "libx264", "-preset", "superfast" if height < 1080 else "veryfast", "-crf", "22"]
     gpu = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23"]
     def build(venc): return ["ffmpeg", "-y", "-ss", f"{start:.2f}", "-i", str(Path(video).resolve()), "-t", f"{dur:.2f}",
            "-filter_complex", f, "-map", f"[{last}]", "-map", "0:a?", *venc,

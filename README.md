@@ -22,6 +22,13 @@ face-tracked crop with blurred fallback) -> karaoke captions (3 templates) -> th
 SQLite persistence, queue resumes after restart, cancel/retry, real progress (done/total).
 REST API: see /docs (projects, clips edit/re-render/delete/export, settings, health, hardware).
 
+## Speed (Fast mode, default)
+- Fast analysis: clip windows are built on real sentence boundaries and pre-scored with cheap heuristics + audio energy (milliseconds); only the best ~30
+  non-overlapping windows go to the LLM, which returns short ratings (not long JSON). Titles are written only for the top 10 clips.
+- Only the top N clips (default 5) are rendered up front; others show a "Render this clip" button. Output height 720p by default (about 2x faster than 1080p).
+- Whisper uses batched decoding when your faster-whisper version supports it.
+- Settings -> "Use settings recommended for this laptop" picks models for your GPU/RAM. Switch Speed mode to "Quality" for the slower full AI scan.
+
 ## Viral potential & silent videos
 - Every clip gets a **Quality score** (weighted hook/information/emotion/curiosity/completeness/shareability/retention/AI viral judgement/audio energy/context, minus penalties)
   and a **Viral potential %** (shareability, retention, AI viral judgement, hook, curiosity, emotion, measured audio energy). Ranking = 60% quality + 40% viral.

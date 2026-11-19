@@ -3,7 +3,7 @@ const W = [['hook', 'Hook strength'], ['information', 'Information value'], ['em
 const DEF = { hook: .12, information: .13, emotion: .12, curiosity: .12, completeness: .12, shareability: .09, retention: .07, viral: .08, engagement: .10, independence: .05 }
 export default function Settings() {
   const [h] = usePoll(api.health, 0); const [s, setS] = useState(null); const [msg, setMsg] = useState('')
-  useEffect(() => { api.settings().then(x => setS({ chunk_seconds: 180, chunk_overlap: 30, min_clip_s: 15, max_clip_s: 90, ...x, weights: { ...DEF, ...(x.weights || {}) } })) }, [])
+  useEffect(() => { api.settings().then(x => setS({ speed_mode: 'fast', auto_render_top: 5, render_height: 720, chunk_seconds: 180, chunk_overlap: 30, min_clip_s: 15, max_clip_s: 90, ...x, weights: { ...DEF, ...(x.weights || {}) } })) }, [])
   if (!s) return <div className="text-slate-400">Loading…</div>
   const set = (k, v) => setS({ ...s, [k]: v }); const save = async () => { await api.saveSettings(s); setMsg('Saved. Applies to the next analysis.') }
   const hw = h?.hardware; const total = Object.values(s.weights).reduce((a, b) => a + b, 0)
@@ -15,6 +15,10 @@ export default function Settings() {
       <div className="grid gap-4 sm:grid-cols-3"><div><label className="label">Whisper model</label><select className="input" value={s.whisper_model} onChange={e => set('whisper_model', e.target.value)}>{['tiny', 'base', 'small', 'medium', 'large-v3'].map(m => <option key={m}>{m}</option>)}</select></div>
         <div><label className="label">Ollama model</label><input className="input" list="m" value={s.ollama_model} onChange={e => set('ollama_model', e.target.value)} /><datalist id="m">{h?.ollama.models?.map(m => <option key={m} value={m} />)}</datalist></div>
         <div><label className="label">Device</label><select className="input" value={s.device} onChange={e => set('device', e.target.value)}><option value="auto">Auto</option><option value="cuda">CUDA (GPU)</option><option value="cpu">CPU</option></select></div></div>
+      <div className="grid gap-4 sm:grid-cols-3"><div><label className="label">Speed mode</label><select className="input" value={s.speed_mode} onChange={e => set('speed_mode', e.target.value)}><option value="fast">Fast (recommended)</option><option value="quality">Quality (slow, full AI scan)</option></select></div>
+        <div><label className="label">Render top N clips first (0 = all)</label><input type="number" className="input" value={s.auto_render_top} onChange={e => set('auto_render_top', +e.target.value)} /></div>
+        <div><label className="label">Output height</label><select className="input" value={s.render_height} onChange={e => set('render_height', +e.target.value)}><option value={720}>720p (fast)</option><option value={1080}>1080p (slower)</option></select></div></div>
+      {h?.recommended && <button className="btn-ghost" onClick={() => setS({ ...s, ...h.recommended })}>⚡ Use settings recommended for this laptop</button>}
       <div className="grid gap-4 sm:grid-cols-4">{[['chunk_seconds', 'Chunk (s)'], ['chunk_overlap', 'Overlap (s)'], ['min_clip_s', 'Min clip (s)'], ['max_clip_s', 'Max clip (s)']].map(([k, l]) => <div key={k}><label className="label">{l}</label><input type="number" className="input" value={s[k]} onChange={e => set(k, +e.target.value)} /></div>)}</div>
       <p className="text-xs text-slate-500">With 4 GB VRAM keep Whisper ≤ small and an LLM ≤ 4B for GPU speed. Larger models will run slower via CPU spill-over.</p></div>
     <div className="card space-y-3 p-6"><div className="flex justify-between"><div className="text-sm font-medium text-white">Ranking weights</div><div className={`text-xs ${Math.abs(total - 1) < .02 ? 'text-slate-400' : 'text-amber-300'}`}>sum {total.toFixed(2)} (normalised automatically)</div></div>

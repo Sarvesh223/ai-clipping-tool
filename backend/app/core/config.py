@@ -12,6 +12,9 @@ DEFAULT_WEIGHTS = {"hook": 0.12, "information": 0.13, "emotion": 0.12, "curiosit
 class Settings:
     ollama_url: str = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+    speed_mode: str = os.getenv("SPEED_MODE", "fast")          # fast = heuristics + short LLM rerank; quality = full LLM scan
+    auto_render_top: int = _i("AUTO_RENDER_TOP", 5)            # render only the best N clips up front (0 = all)
+    render_height: int = _i("RENDER_HEIGHT", 720)              # 720 renders ~2x faster than 1080
     chunk_seconds: float = _f("CHUNK_SECONDS", 180)
     chunk_overlap: float = _f("CHUNK_OVERLAP", 30)
     max_candidates_per_chunk: int = _i("MAX_CANDIDATES_PER_CHUNK", 3)
